@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ma liste de tâches</title>
+<style>
+  :root {
+    --bg: #f5f5f4;
+    --card: #ffffff;
+    --text: #1c1917;
+    --muted: #78716c;
+    --border: #e7e5e4;
+    --accent: #ee5f2b;
+    --accent-text: #ffffff;
+    --done: #a8a29e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1917;
+      --card: #292524;
+      --text: #f5f5f4;
+      --muted: #a8a29e;
+      --border: #44403c;
+      --done: #78716c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1c1917;
+    --card: #292524;
+    --text: #f5f5f4;
+    --muted: #a8a29e;
+    --border: #44403c;
+    --done: #78716c;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 48px 16px;
+  }
+  main {
+    width: 100%;
+    max-width: 520px;
+  }
+  h1 {
+    font-size: 28px;
+    margin: 0 0 20px;
+  }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+  form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 14px;
+    font: inherit;
+    color: var(--text);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    outline: none;
+  }
+  input[type="text"]:focus { border-color: var(--accent); }
+  button {
+    font: inherit;
+    cursor: pointer;
+    color: var(--text);
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .add {
+    background: var(--accent);
+    color: var(--accent-text);
+    font-weight: bold;
+    padding: 12px 18px;
+    border-radius: 10px;
+  }
+  .add.small {
+    padding: 8px 12px;
+    font-size: 14px;
+    border-radius: 8px;
+  }
+  .hint {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* Gestion des tags */
+  .tag-manager {
+    margin-bottom: 20px;
+  }
+  .tag-form {
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .tag-form input[type="text"] {
+    padding: 10px 12px;
+  }
+  #tag-color {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--t);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1.6;
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .tag-remove {
+    color: #ffffff;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 0 0 2px;
+    border: none;
+    border-radius: 0;
+  }
+
+  /* Filtres */
+  .filters {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .filters button {
+    color: var(--muted);
+    padding: 6px 12px;
+    border-radius: 999px;
+  }
+  .filters button[aria-pressed="true"] {
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--text);
+    font-weight: bold;
+  }
+  .tag-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .tag-toggle {
+    background: var(--card);
+    color: var(--t);
+    border: 2px solid var(--t);
+    font-size: 12px;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .tag-toggle[aria-pressed="true"] {
+    background: var(--t);
+    color: #ffffff;
+  }
+
+  /* Liste : la couleur d'une tâche racine est définie dans --c et héritée par ses sous-tâches */
+  ul.tree, ul.children {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  ul.tree {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  ul.children {
+    padding-left: 26px;
+  }
+  li.node {
+    border-top: 1px solid var(--border);
+  }
+  li.node:first-child { border-top: none; }
+  li.root {
+    border-left: 4px solid var(--c);
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+  .row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--c);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .label {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    cursor: text;
+  }
+  li.done > .row .label {
+    color: var(--done);
+    text-decoration: line-through;
+  }
+  .row .tags {
+    gap: 4px;
+  }
+  .swatch {
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--c);
+    border: 2px solid var(--card);
+    box-shadow: 0 0 0 1px var(--border);
+    flex-shrink: 0;
+  }
+  .icon {
+    color: var(--muted);
+    font-size: 18px;
+    line-height: 1;
+    padding: 4px 6px;
+  }
+  .icon:hover { color: var(--accent); }
+  .icon[aria-pressed="true"] { color: var(--accent); }
+  .tag-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 14px 10px;
+  }
+  .sub-form {
+    display: flex;
+    gap: 8px;
+    padding: 0 14px 10px;
+  }
+  .sub-input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+  }
+  .sub-input:focus { border-color: var(--c); }
+  .empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--muted);
+  }
+  footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  footer button {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  footer button:hover { color: var(--accent); }
+  footer button:disabled { opacity: 0.4; cursor: default; }
+  footer button:disabled:hover { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ma liste de tâches</h1>
+
+  <form id="new-task">
+    <input type="text" id="input" placeholder="Ajouter une tâche…" autocomplete="off" aria-label="Nouvelle tâche">
+    <button type="submit" class="add">Ajouter</button>
+  </form>
+
+  <section class="tag-manager">
+    <h2>Tags</h2>
+    <form id="tag-form" class="tag-form">
+      <input type="text" id="tag-name" placeholder="Nouveau tag…" autocomplete="off" aria-label="Nom du tag">
+      <button type="button" id="tag-color" class="swatch" title="Changer la couleur du tag" aria-label="Changer la couleur du tag"></button>
+      <button type="submit" class="add small">Créer</button>
+    </form>
+    <div id="tag-list" class="tags"></div>
+  </section>
+
+  <div class="filters" role="group" aria-label="Filtrer">
+    <button type="button" data-filter="all" aria-pressed="true">Toutes</button>
+    <button type="button" data-filter="active" aria-pressed="false">En cours</button>
+    <button type="button" data-filter="done" aria-pressed="false">Terminées</button>
+  </div>
+
+  <div id="filter-tags" class="tag-filters" role="group" aria-label="Filtrer par tag"></div>
+
+  <ul id="list" class="tree"></ul>
+
+  <footer>
+    <span id="count"></span>
+    <button type="button" id="clear-done">Supprimer les terminées</button>
+  </footer>
+</main>
+
+<script>
+  const STORAGE_KEY = 'todo-list-v2';
+  const OLD_KEY = 'todo-list-v1';
+  const PALETTE = ['#ee5f2b', '#2563eb', '#16a34a', '#9333ea', '#db2777', '#0891b2', '#b45309'];
+
+  let tasks = [];
+  let tags = [];
+  let filter = 'all';
+  let tagFilters = new Set();
+  let newTagColor = 0;
+  // État de l'interface : une seule modification, un seul panneau ouvert à la fois
+  const ui = { editing: null, tagPicker: null, subForm: null };
+
+  const form = document.getElementById('new-task');
+  const input = document.getElementById('input');
+  const tagForm = document.getElementById('tag-form');
+  const tagName = document.getElementById('tag-name');
+  const tagColorBtn = document.getElementById('tag-color');
+  const tagList = document.getElementById('tag-list');
+  const filterTags = document.getElementById('filter-tags');
+  const list = document.getElementById('list');
+  const count = document.getElementById('count');
+  const clearDone = document.getElementById('clear-done');
+
+  function makeId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  function newTask(text, color = 0) {
+    return { id: makeId(), text, done: false, color, tags: [], subtasks: [] };
+  }
+
+  function normalizeTask(node) {
+    return {
+      id: node.id || makeId(),
+      text: String(node.text || ''),
+      done: !!node.done,
+      color: Number.isInteger(node.color) ? node.color : 0,
+      tags: Array.isArray(node.tags) ? node.tags.filter(id => typeof id === 'string') : [],
+      subtasks: Array.isArray(node.subtasks) ? node.subtasks.map(normalizeTask) : []
+    };
+  }
+
+  function normalizeTag(tag) {
+    return {
+      id: tag.id || makeId(),
+      name: String(tag.name || '').trim() || 'Tag',
+      color: Number.isInteger(tag.color) ? tag.color : 0
+    };
+  }
+
+  function readJSON(key) {
+    try {
+      return JSON.parse(localStorage.getItem(key));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function loadState() {
+    const saved = readJSON(STORAGE_KEY);
+    if (saved && typeof saved === 'object') {
+      return {
+        tasks: Array.isArray(saved.tasks) ? saved.tasks.map(normalizeTask) : [],
+        tags: Array.isArray(saved.tags) ? saved.tags.map(normalizeTag) : []
+      };
+    }
+    // Migration depuis la version précédente (liste de tâches seule)
+    const old = readJSON(OLD_KEY);
+    return { tasks: Array.isArray(old) ? old.map(normalizeTask) : [], tags: [] };
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, tags }));
+    } catch (e) {
+      // Stockage indisponible (navigation privée, données bloquées) : la liste reste utilisable
+    }
+  }
+
+  function el(tag, cls, text) {
+    const node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function tagById(id) {
+    return tags.find(t => t.id === id);
+  }
+
+  function tagColor(tag) {
+    return PALETTE[tag.color % PALETTE.length];
+  }
+
+  function tagPill(tag) {
+    const pill = el('span', 'tag', tag.name);
+    pill.style.setProperty('--t', tagColor(tag));
+    return pill;
+  }
+
+  function removeFrom(nodes, id) {
+    const i = nodes.findIndex(n => n.id === id);
+    if (i >= 0) {
+      nodes.splice(i, 1);
+      return true;
+    }
+    return nodes.some(n => removeFrom(n.subtasks, id));
+  }
+
+  function stripTag(nodes, id) {
+    nodes.forEach(n => {
+      n.tags = n.tags.filter(t => t !== id);
+      stripTag(n.subtasks, id);
+    });
+  }
+
+  function purgeDone(nodes) {
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      if (nodes[i].done) nodes.splice(i, 1);
+      else purgeDone(nodes[i].subtasks);
+    }
+  }
+
+  function countOpen(nodes) {
+    return nodes.reduce((n, t) => n + (t.done ? 0 : 1) + countOpen(t.subtasks), 0);
+  }
+
+  function hasDone(nodes) {
+    return nodes.some(t => t.done || hasDone(t.subtasks));
+  }
+
+  // Une tâche correspond si elle ou une de ses sous-tâches porte un des tags filtrés
+  function matchesTagFilter(node) {
+    if (tagFilters.size === 0) return true;
+    return node.tags.some(id => tagFilters.has(id)) || node.subtasks.some(matchesTagFilter);
+  }
+
+  function visibleTasks() {
+    return tasks.filter(t => {
+      if (filter === 'active' && t.done) return false;
+      if (filter === 'done' && !t.done) return false;
+      return matchesTagFilter(t);
+    });
+  }
+
+  function commitEdit(task, value) {
+    if (ui.editing !== task.id) return;
+    ui.editing = null;
+    const text = value.trim();
+    if (text) task.text = text;
+    saveState();
+    render();
+  }
+
+  function buildEditInput(task) {
+    const editInput = el('input', 'sub-input edit-input');
+    editInput.type = 'text';
+    editInput.value = task.text;
+    editInput.setAttribute('aria-label', 'Modifier le titre');
+    editInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        commitEdit(task, editInput.value);
+      } else if (e.key === 'Escape') {
+        ui.editing = null;
+        render();
+      }
+    });
+    editInput.addEventListener('blur', () => commitEdit(task, editInput.value));
+    return editInput;
+  }
+
+  function buildTagPicker(task) {
+    const picker = el('div', 'tag-picker');
+    if (tags.length === 0) {
+      picker.appendChild(el('span', 'hint', 'Aucun tag. Créez-en un dans la section Tags.'));
+      return picker;
+    }
+    tags.forEach(tag => {
+      const on = task.tags.includes(tag.id);
+      const toggle = el('button', 'tag-toggle', tag.name);
+      toggle.type = 'button';
+      toggle.style.setProperty('--t', tagColor(tag));
+      toggle.setAttribute('aria-pressed', String(on));
+      toggle.addEventListener('click', () => {
+        task.tags = on ? task.tags.filter(id => id !== tag.id) : [...task.tags, tag.id];
+        saveState();
+        render();
+      });
+      picker.appendChild(toggle);
+    });
+    return picker;
+  }
+
+  function buildSubForm(task) {
+    const subForm = el('form', 'sub-form');
+    const subInput = el('input', 'sub-input');
+    subInput.type = 'text';
+    subInput.placeholder = 'Nouvelle sous-tâche…';
+    subInput.autocomplete = 'off';
+    subInput.setAttribute('aria-label', 'Nouvelle sous-tâche');
+    const submit = el('button', 'add small', 'Ajouter');
+    submit.type = 'submit';
+
+    subForm.append(subInput, submit);
+    subForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const text = subInput.value.trim();
+      if (!text) return;
+      task.subtasks.push(newTask(text));
+      ui.subForm = null;
+      saveState();
+      render();
+    });
+    subInput.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        ui.subForm = null;
+        render();
+      }
+    });
+    return subForm;
+  }
+
+  function buildNode(task, isRoot) {
+    const li = el('li', 'node');
+    if (isRoot) {
+      li.classList.add('root');
+      li.style.setProperty('--c', PALETTE[task.color % PALETTE.length]);
+    }
+    if (task.done) li.classList.add('done');
+
+    const row = el('div', 'row');
+
+    const checkbox = el('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = task.done;
+    checkbox.setAttribute('aria-label', 'Marquer comme terminée');
+    checkbox.addEventListener('change', () => {
+      task.done = checkbox.checked;
+      saveState();
+      render();
+    });
+
+    row.appendChild(checkbox);
+
+    if (ui.editing === task.id) {
+      row.appendChild(buildEditInput(task));
+    } else {
+      const label = el('span', 'label', task.text);
+      label.title = 'Double-cliquer pour modifier';
+      label.addEventListener('dblclick', () => {
+        ui.editing = task.id;
+        render();
+      });
+      row.appendChild(label);
+    }
+
+    const tagsBox = el('span', 'tags');
+    task.tags.forEach(id => {
+      const tag = tagById(id);
+      if (tag) tagsBox.appendChild(tagPill(tag));
+    });
+    row.appendChild(tagsBox);
+
+    if (isRoot) {
+      const swatch = el('button', 'swatch');
+      swatch.type = 'button';
+      swatch.title = 'Changer la couleur';
+      swatch.setAttribute('aria-label', 'Changer la couleur de la tâche');
+      swatch.addEventListener('click', () => {
+        task.color = (task.color + 1) % PALETTE.length;
+        saveState();
+        render();
+      });
+      row.appendChild(swatch);
+    }
+
+    const edit = el('button', 'icon', '✎');
+    edit.type = 'button';
+    edit.title = 'Modifier le titre';
+    edit.setAttribute('aria-label', 'Modifier le titre');
+    edit.addEventListener('click', () => {
+      ui.editing = task.id;
+      render();
+    });
+
+    const tagBtn = el('button', 'icon', '#');
+    tagBtn.type = 'button';
+    tagBtn.title = 'Gérer les tags';
+    tagBtn.setAttribute('aria-label', 'Gérer les tags');
+    tagBtn.setAttribute('aria-pressed', String(ui.tagPicker === task.id));
+    tagBtn.addEventListener('click', () => {
+      ui.tagPicker = ui.tagPicker === task.id ? null : task.id;
+      render();
+    });
+
+    const addSub = el('button', 'icon', '+');
+    addSub.type = 'button';
+    addSub.title = 'Ajouter une sous-tâche';
+    addSub.setAttribute('aria-label', 'Ajouter une sous-tâche');
+    addSub.addEventListener('click', () => {
+      ui.subForm = ui.subForm === task.id ? null : task.id;
+      render();
+    });
+
+    const del = el('button', 'icon', '×');
+    del.type = 'button';
+    del.setAttribute('aria-label', 'Supprimer la tâche');
+    del.addEventListener('click', () => {
+      removeFrom(tasks, task.id);
+      saveState();
+      render();
+    });
+
+    row.append(edit, tagBtn, addSub, del);
+    li.appendChild(row);
+
+    if (ui.tagPicker === task.id) li.appendChild(buildTagPicker(task));
+    if (ui.subForm === task.id) li.appendChild(buildSubForm(task));
+
+    if (task.subtasks.length) {
+      const children = el('ul', 'children');
+      task.subtasks.forEach(sub => children.appendChild(buildNode(sub, false)));
+      li.appendChild(children);
+    }
+
+    return li;
+  }
+
+  function renderTagManager() {
+    tagColorBtn.style.setProperty('--c', PALETTE[newTagColor]);
+    tagList.replaceChildren();
+
+    if (tags.length === 0) {
+      tagList.appendChild(el('span', 'hint', 'Aucun tag pour le moment.'));
+      return;
+    }
+    tags.forEach(tag => {
+      const pill = tagPill(tag);
+      const remove = el('button', 'tag-remove', '×');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', `Supprimer le tag ${tag.name}`);
+      remove.addEventListener('click', () => {
+        if (!confirm(`Supprimer le tag « ${tag.name} » de toutes les tâches ?`)) return;
+        stripTag(tasks, tag.id);
+        tags = tags.filter(t => t.id !== tag.id);
+        tagFilters.delete(tag.id);
+        saveState();
+        render();
+      });
+      pill.appendChild(remove);
+      tagList.appendChild(pill);
+    });
+  }
+
+  function renderFilterTags() {
+    filterTags.replaceChildren();
+    filterTags.hidden = tags.length === 0;
+    tags.forEach(tag => {
+      const on = tagFilters.has(tag.id);
+      const toggle = el('button', 'tag-toggle', tag.name);
+      toggle.type = 'button';
+      toggle.style.setProperty('--t', tagColor(tag));
+      toggle.setAttribute('aria-pressed', String(on));
+      toggle.dataset.tagId = tag.id;
+      filterTags.appendChild(toggle);
+    });
+  }
+
+  function render() {
+    list.replaceChildren();
+
+    const shown = visibleTasks();
+    if (shown.length === 0) {
+      const message = tasks.length === 0 ? 'Aucune tâche pour le moment.' : 'Aucune tâche ne correspond aux filtres.';
+      list.appendChild(el('li', 'empty', message));
+    }
+    shown.forEach(task => list.appendChild(buildNode(task, true)));
+
+    const remaining = countOpen(tasks);
+    count.textContent = remaining === 1 ? '1 tâche restante' : `${remaining} tâches restantes`;
+    clearDone.disabled = !hasDone(tasks);
+
+    document.querySelectorAll('.filters button').forEach(btn => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.filter === filter));
+    });
+
+    renderTagManager();
+    renderFilterTags();
+
+    if (ui.subForm !== null) {
+      const subInput = list.querySelector('.sub-input');
+      if (subInput) subInput.focus();
+    }
+    if (ui.editing !== null) {
+      const editInput = list.querySelector('.edit-input');
+      if (editInput) {
+        editInput.focus();
+        editInput.select();
+      }
+    }
+  }
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    tasks.unshift(newTask(text, tasks.length % PALETTE.length));
+    input.value = '';
+    saveState();
+    render();
+  });
+
+  tagForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const name = tagName.value.trim();
+    if (!name) return;
+    tags.push({ id: makeId(), name, color: newTagColor });
+    newTagColor = (newTagColor + 1) % PALETTE.length;
+    tagName.value = '';
+    saveState();
+    render();
+  });
+
+  tagColorBtn.addEventListener('click', () => {
+    newTagColor = (newTagColor + 1) % PALETTE.length;
+    render();
+  });
+
+  document.querySelector('.filters').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-filter]');
+    if (!btn) return;
+    filter = btn.dataset.filter;
+    render();
+  });
+
+  filterTags.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-tag-id]');
+    if (!btn) return;
+    const id = btn.dataset.tagId;
+    if (tagFilters.has(id)) tagFilters.delete(id);
+    else tagFilters.add(id);
+    render();
+  });
+
+  clearDone.addEventListener('click', () => {
+    purgeDone(tasks);
+    saveState();
+    render();
+  });
+
+  const saved = loadState();
+  tasks = saved.tasks;
+  tags = saved.tags;
+  render();
+</script>
+</body>
+</html>
